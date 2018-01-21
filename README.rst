@@ -12,7 +12,7 @@ Install dependencies
 
     pip install -r requirements.txt
 
+Required software
+`````````````````
 
-install `dynet`_
-
-.. _`dynet`: https://github.com/clab/dynet
+ * [DyNet version 2.0](https://github.com/clab/dynet)
