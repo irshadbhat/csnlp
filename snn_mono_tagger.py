@@ -452,4 +452,4 @@ if __name__ == '__main__':
     elif args.base_model:
         tagger = POSTagger(model=args.base_model, new_meta=meta)
         trainer = meta.trainer(tagger.model)
-        train_tagger(train[1000:2000])
+        train_tagger(train)

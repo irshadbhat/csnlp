@@ -613,4 +613,4 @@ if __name__ == "__main__":
     else:
         parser = Parser(meta=meta)
         trainer = meta.trainer(parser.model)
-        train_parser(train_sents[:1000])
+        train_parser(train_sents)
