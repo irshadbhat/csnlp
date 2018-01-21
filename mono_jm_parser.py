@@ -289,7 +289,7 @@ class Parser(ArcEager):
         rfeatures = self.basefeaturesEager(configuration.nodes, configuration.stack, configuration.b0)
         xi = dy.concatenate([pr_bi_exps[id-1] if id > 0 else self.pad for id, rform in rfeatures])
         xh = self.pr_W1 * xi
-        xh = meta.activation(xh) + self.pr_b1
+        xh = self.meta.activation(xh) + self.pr_b1
         return self.pr_W2*xh + self.pr_b2
     
 
