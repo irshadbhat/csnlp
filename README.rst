@@ -13,6 +13,6 @@ Install dependencies
     pip install -r requirements.txt
 
 
-`dynet`_
+install `dynet`_
 
 .. _`dynet`: https://github.com/clab/dynet
