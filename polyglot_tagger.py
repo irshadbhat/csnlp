@@ -208,16 +208,27 @@ def read(fname, lang=None):
             sent = []
         else:
             if not lang:
-                w,p,l = line[2], line[pid], line[8]
+                try:
+                    w,p,l = line
+                except ValueError:
+                    try:
+                        w,p,l = line[2], line[pid], line[8]
+                    except Exception:
+                        sys.stderr.write('Wrong file format\n')
+                        sys.exit(1)
                 l = l.split('|')[0]
                 l = 'hi' if l=='hi' else 'en'
-                sent.append((w,p,l))
-            elif lang == 'hi':
-                w,p,l = line[1], line[pid], 'hi'
-                sent.append((w,p,l))
-            elif lang == 'en':
-                w,p,l = line[1], line[pid], 'en'
-                sent.append((w,p,l))
+            else:
+                l = 'hi' if lang == 'hi' else 'en'
+                try:
+                    w,p = line
+                except ValueError:
+                    try:
+                        w,p = line[1], line[pid]
+                    except Exception:
+                        sys.stderr.write('Wrong file format\n')
+                        sys.exit(1)
+            sent.append((w,p,l))
     if sent: data.append(sent)
     return data
 

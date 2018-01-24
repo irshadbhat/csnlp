@@ -202,7 +202,14 @@ def read(fname):
             data.append(sent)
             sent = []
         else:
-            w,p = line[1], line[pid]
+            try:
+                w,p = line
+            except ValueError:
+                try:
+                    w,p = line[1], line[pid]
+                except Exception:
+                    sys.stderr.write('Wrong file format\n')
+                    sys.exit(1)
             sent.append((w,p))
     if sent: data.append(sent)
     return data

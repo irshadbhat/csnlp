@@ -291,7 +291,14 @@ def read(fname, lang=None):
             data.append(sent)
             sent = []
         else:
-            w,p,l = line[2], line[pid], line[8]
+            try:
+                w,p,l = line
+            except ValueError:
+                try:
+                    w,p,l = line[2], line[pid], line[8]
+                except Exception:
+                    sys.stderr.write('Wrong file format\n')
+                    sys.exit(1)
             l = l.split('|')[0]
             l = 'hi' if l=='hi' else 'en'
             sent.append((w,p,l))
