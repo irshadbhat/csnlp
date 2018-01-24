@@ -21,3 +21,16 @@ Files you care about?
   - ``snn_polyglot_tagger.py`` Neural Stacking Multilingual Tagger: Train a stacking tagger (using code switching data) on top of the base model trained using ``polyglot_tagger.py``. The code switching training file should be in tri-column (normalized/back-transliterated word, POS tag, lang tag) or CONLL format. In case of CONLL format, the normalized/back-transliterated words should be in 3rd column and the language tags should be in 9th column. See ``python snn_polyglot_tagger.py --help`` for various command-line options and network hyperparameters. 
   - ``polyglot_jm_parser.py`` Multilingual Parser: Use this code to train a parser for code switching data using only the monolingual treebanks. See ``python polyglot_jm_parser.py --help`` for various command-line options and network hyperparameters.
   - ``snn_polyglot_jm_parser.py`` Neural Stacking Multilingual Parser: Train a stacking parser (using code switching data) on top of the base model trained using ``polyglot_jm_parser.py``. The normalized/back-transliterated words should be in 3rd column and the language tags should be in 9th column. See ``python snn_polyglot_jm_parser.py --help`` for various command-line options and network hyperparameters. 
+
+
+Training Models
+^^^^^^^^^^^^^^^
+
+Testing Models
+^^^^^^^^^^^^^^^
+
+
+Use Pretrained Models
+^^^^^^^^^^^^^^^^^^^^^
+
+You can use pretrained models from `sndpcs-models <https://bitbucket.org/irshadbhat/sndpcs-models>`_.
