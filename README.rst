@@ -33,4 +33,4 @@ Testing Models
 Use Pretrained Models
 ^^^^^^^^^^^^^^^^^^^^^
 
-You can use pretrained models from `sndpcs-models <https://bitbucket.org/irshadbhat/sndpcs-models>`_.
+You can use pretrained models from `nsdp-cs-models <https://bitbucket.org/irshadbhat/nsdp-cs-models>`_.
