@@ -1,7 +1,7 @@
-Stack-augmented Neural Dependency Parser for Code Switching texts
-=================================================================
+Neural Stacking Dependency Parsers for Code Switching texts
+===========================================================
 
-Neural Stacking Dependency Parsers for monolingual, multilingual and code-switching data.
+Neural Stacking Dependency Parsers for monolingual, multilingual and code switching data.
 
 Install dependencies
 ^^^^^^^^^^^^^^^^^^^^
