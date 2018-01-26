@@ -50,7 +50,7 @@ Training Models
     --daemonize                Daemonize parser
     --port DAEMONPORT          Specify a port number
 
-  python --dynet-seed 127 --train /path/to/train-file --dev /path/to/dev-file --pretrained-embds 
+  python mono_jm_parser.py --dynet-seed 127 --train /path/to/train-file --dev /path/to/dev-file --pretrained-embds 
          /path/to/gensim-pretrained-embedding --elimit 300000 --lang eng --trainer adam --ud 1 
          --iter 100 --bvec 1 --save /path/to/save-model
 
