@@ -1,7 +1,9 @@
 Neural Stacking Dependency Parsers for Code Switching texts
 ===========================================================
 
-Neural Stacking Dependency Parsers for monolingual, multilingual and code switching data.
+Neural Stacking Dependency Parsers for monolingual, multilingual and code switching data. This repository contains the source code described in our paper `Universal Dependency Parsing for Hindi-English Code-switching`_.
+
+.. _`Universal Dependency Parsing for Hindi-English Code-switching`:
 
 Install dependencies
 ^^^^^^^^^^^^^^^^^^^^
@@ -26,9 +28,113 @@ Files you care about?
 Training Models
 ^^^^^^^^^^^^^^^
 
-Testing Models
-^^^^^^^^^^^^^^^
+.. parsed-literal::
 
+  python mono_jm_parser.py --help
+  
+    --dynet-seed SEED
+    --train TRAIN [TRAIN ...]  CONLL Train file
+    --dev DEV [DEV ...]        CONLL Dev/Test file
+    --test TEST                Raw Test file
+    --pretrained-embds EMBD    Pretrained word2vec Embeddings
+    --elimit ELIMIT            load only top-n pretrained word vectors (default = all vectors)
+    --lang LANG                3-letter ISO language code e.g., eng for English, hin for Hindi
+    --trainer TRAINER          Trainer [momsgd|adam|adadelta|adagrad]
+    --activation-fn ACT_FN     Activation function [tanh|rectify|logistic]
+    --ud UD                    1 if UD treebank else 0
+    --iter ITER                No. of Epochs
+    --bvec BVEC                1 if binary embedding file else 0
+    --save-model SAVE_MODEL    Specify path to save model
+    --load-model LOAD_MODEL    Load Pretrained Model
+    --output-file OUTFILE      Output File
+    --daemonize                Daemonize parser
+    --port DAEMONPORT          Specify a port number
+
+  python --dynet-seed 127 --train /path/to/train-file --dev /path/to/dev-file --pretrained-embds 
+         /path/to/gensim-pretrained-embedding --elimit 300000 --lang eng --trainer adam --ud 1 
+         --iter 100 --bvec 1 --save /path/to/save-model
+
+
+Testing Models
+^^^^^^^^^^^^^^
+
+You can test the models in four different settings:
+
+1) Annotated Test/Dev file
+##########################
+
+::
+
+    python mono_jm_parser.py --load /path/to/saved-model --dev /path/to/conll-test-or-dev-file
+
+2) Raw Test file
+################
+
+::
+
+    python mono_jm_parser.py --load /path/to/saved-model --test /path/to/raw-text-file
+
+3) Call within Python
+#####################
+
+.. code:: python
+
+    >>> from mono_jm_parser import *
+    [dynet] random seed: 497379357
+    [dynet] allocating memory: 512MB
+    [dynet] memory allocation done.
+    >>> 
+    >>> parser = Parser(model='/home/irshad/Projects/BITProjects/nsdp-cs-models/PTB/PARSER/en-ptb-parser')
+    >>> raw_sent = 'Give me back my peace of mind .'.split()
+    >>> 
+    >>> print parse_sent(parser, raw_sent)
+    1	Give	_	VB	_	_	0	root	_	_
+    2	me	_	PRP	_	_	1	iobj	_	_
+    3	back	_	RP	_	_	1	prt	_	_
+    4	my	_	PRP$	_	_	5	poss	_	_
+    5	peace	_	NN	_	_	1	dobj	_	_
+    6	of	_	IN	_	_	5	prep	_	_
+    7	mind	_	NN	_	_	6	pobj	_	_
+    8	.	_	.	_	_	1	punct	_	_
+    >>> 
+
+4) Daemonize
+############
+
+Run the parser in daemonize mode:
+
+.. parsed-literal::
+
+    python mono_jm_parser.py --load ~/Projects/BITProjects/nsdp-cs-models/PTB/PARSER/en-ptb-parser --daemonize --port 4000
+    [dynet] random seed: 2719235480
+    [dynet] allocating memory: 512MB
+    [dynet] memory allocation done.
+    Loading Models ...
+    Done!
+
+Open a new terminal and parse sentences using the command:
+
+.. parsed-literal::
+
+    echo 'I see skies of blue , clouds of white , bright blessed days , dark sacred night .' | nc localhost 4000
+    1	I	_	PRP	_	_	2	nsubj	_	_
+    2	see	_	VBP	_	_	0	root	_	_
+    3	skies	_	NNS	_	_	2	dobj	_	_
+    4	of	_	IN	_	_	3	prep	_	_
+    5	blue	_	JJ	_	_	7	amod	_	_
+    6	,	_	,	_	_	7	punct	_	_
+    7	clouds	_	NNS	_	_	3	conj	_	_
+    8	of	_	IN	_	_	7	prep	_	_
+    9	white	_	JJ	_	_	13	amod	_	_
+    10	,	_	,	_	_	13	punct	_	_
+    11	bright	_	RB	_	_	12	advmod	_	_
+    12	blessed	_	JJ	_	_	13	amod	_	_
+    13	days	_	NNS	_	_	8	pobj	_	_
+    14	,	_	,	_	_	7	punct	_	_
+    15	dark	_	JJ	_	_	17	amod	_	_
+    16	sacred	_	JJ	_	_	17	amod	_	_
+    17	night	_	NN	_	_	7	npadvmod    _	_
+    18	.	_	.	_	_	2	punct	_	_
 
 Use Pretrained Models
 ^^^^^^^^^^^^^^^^^^^^^
