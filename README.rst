@@ -1,9 +1,10 @@
 Neural Stacking Dependency Parsers for Code Switching texts
 ===========================================================
 
-Neural Stacking Dependency Parsers for monolingual, multilingual and code switching data. This repository contains the source code described in our paper `Universal Dependency Parsing for Hindi-English Code-switching`_ (Under Review Naacl 2018).
+Neural Stacking Dependency Parsers for monolingual, multilingual and code switching data. This repository contains the source code described in our paper `Universal Dependency Parsing for Hindi-English Code-switching`_ (Under Review `Naacl 2018`_).
 
 .. _`Universal Dependency Parsing for Hindi-English Code-switching`:
+.. _`Naacl 2018`: http://naacl2018.org/
 
 Install dependencies
 ^^^^^^^^^^^^^^^^^^^^
