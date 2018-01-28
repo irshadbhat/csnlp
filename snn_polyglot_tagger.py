@@ -74,9 +74,9 @@ class POSTagger():
         self.xB2 = self.model.add_parameters(self.meta.xn_tags)
 
         # word-level LSTMs
-        self.xfwdRNN = dy.LSTMBuilder(1, self.meta.w_dim_eng+self.meta.xlstm_char_dim*2+self.meta.xn_hidden,
+        self.xfwdRNN = dy.LSTMBuilder(1, self.meta.w_dim_eng+self.meta.xlstm_char_dim*2+self.meta.n_hidden,
                                         self.meta.xlstm_word_dim, self.model)
-        self.xbwdRNN = dy.LSTMBuilder(1, self.meta.w_dim_eng+self.meta.xlstm_char_dim*2+self.meta.xn_hidden,
+        self.xbwdRNN = dy.LSTMBuilder(1, self.meta.w_dim_eng+self.meta.xlstm_char_dim*2+self.meta.n_hidden,
                                         self.meta.xlstm_word_dim, self.model)
         self.xfwdRNN2 = dy.LSTMBuilder(1, self.meta.xlstm_word_dim*2, self.meta.xlstm_word_dim, self.model) 
         self.xbwdRNN2 = dy.LSTMBuilder(1, self.meta.xlstm_word_dim*2, self.meta.xlstm_word_dim, self.model)
