@@ -109,7 +109,7 @@ class Parser(ArcEager):
         self.xps_pW2 = self.model.add_parameters((self.meta.xn_tags, self.meta.xp_hidden))
         self.xps_pb2 = self.model.add_parameters(self.meta.xn_tags)
 
-        self.xpr_pW1 = self.model.add_parameters((self.meta.xn_hidden, self.meta.xlstm_wc_dim*2*self.meta.window+self.meta.xn_hidden))
+        self.xpr_pW1 = self.model.add_parameters((self.meta.xn_hidden, self.meta.xlstm_wc_dim*2*self.meta.window+self.meta.n_hidden))
         self.xpr_pb1 = self.model.add_parameters(self.meta.xn_hidden)
         self.xpr_pW2 = self.model.add_parameters((self.meta.xn_outs, self.meta.xn_hidden))
         self.xpr_pb2 = self.model.add_parameters(self.meta.xn_outs)
@@ -119,12 +119,12 @@ class Parser(ArcEager):
         self.xecfwdRNN = dy.LSTMBuilder(1, self.meta.xc_dim, self.meta.xlstm_char_dim, self.model)
         self.xecbwdRNN = dy.LSTMBuilder(1, self.meta.xc_dim, self.meta.xlstm_char_dim, self.model)
 
-        self.xps_fwdRNN = dy.LSTMBuilder(1, self.meta.w_dim+self.meta.xlstm_char_dim*2+self.meta.xp_hidden, self.meta.xlstm_wc_dim, self.model)
-        self.xps_bwdRNN = dy.LSTMBuilder(1, self.meta.w_dim+self.meta.xlstm_char_dim*2+self.meta.xp_hidden, self.meta.xlstm_wc_dim, self.model)
+        self.xps_fwdRNN = dy.LSTMBuilder(1, self.meta.w_dim+self.meta.xlstm_char_dim*2+self.meta.p_hidden, self.meta.xlstm_wc_dim, self.model)
+        self.xps_bwdRNN = dy.LSTMBuilder(1, self.meta.w_dim+self.meta.xlstm_char_dim*2+self.meta.p_hidden, self.meta.xlstm_wc_dim, self.model)
 
-        self.xpr_fwdRNN = dy.LSTMBuilder(1, self.meta.xlstm_wc_dim*2+self.meta.w_dim+self.meta.xlstm_char_dim*2+self.meta.xp_hidden,
+        self.xpr_fwdRNN = dy.LSTMBuilder(1, self.meta.lstm_wc_dim*2+self.meta.w_dim+self.meta.xlstm_char_dim*2+self.meta.xp_hidden,
                             self.meta.xlstm_wc_dim, self.model)
-        self.xpr_bwdRNN = dy.LSTMBuilder(1, self.meta.xlstm_wc_dim*2+self.meta.w_dim+self.meta.xlstm_char_dim*2+self.meta.xp_hidden,
+        self.xpr_bwdRNN = dy.LSTMBuilder(1, self.meta.lstm_wc_dim*2+self.meta.w_dim+self.meta.xlstm_char_dim*2+self.meta.xp_hidden,
                             self.meta.xlstm_wc_dim, self.model)
 
         self.XPAD = self.model.add_parameters(self.meta.xlstm_wc_dim*2)
@@ -401,7 +401,7 @@ def Train(sentence, epoch, dynamic=True):
     while not parser.isFinalState(configuration):
         rfeatures = parser.basefeaturesEager(configuration.nodes, configuration.stack, configuration.b0)
         xi = dy.concatenate([pr_bi_exps[id-1] if id > 0 else parser.pad for id, rform in rfeatures])
-        yi = dy.concatenate([xpr_bi_exps[id-1] if id > 0 else parser.pad for id, rform in rfeatures])
+        yi = dy.concatenate([xpr_bi_exps[id-1] if id > 0 else parser.xpad for id, rform in rfeatures])
         xh = parser.pr_W1 * xi
         xi = dy.concatenate([yi, xh])
         xh = parser.xpr_W1 * xi
@@ -459,7 +459,7 @@ def Test(test_file, ofp=None, lang=None):
         while not parser.isFinalState(configuration):
             rfeatures = parser.basefeaturesEager(configuration.nodes, configuration.stack, configuration.b0)
             xi = dy.concatenate([pr_bi_exps[id-1] if id > 0 else parser.pad for id, rform in rfeatures])
-            yi = dy.concatenate([xpr_bi_exps[id-1] if id > 0 else parser.pad for id, rform in rfeatures])
+            yi = dy.concatenate([xpr_bi_exps[id-1] if id > 0 else parser.xpad for id, rform in rfeatures])
             xh = parser.pr_W1 * xi
             xi = dy.concatenate([yi, xh])
             xh = parser.xpr_W1 * xi
@@ -506,7 +506,7 @@ def tree_eval(sentence, scores):
 def train_parser(dataset):
     n_samples = len(dataset)
     sys.stdout.write("Started training ...\n")
-    sys.stdout.write("Training Examples: %s Classes: %s Epochs: %d\n\n" % (n_samples, parser.meta.n_outs, args.iter))
+    sys.stdout.write("Training Examples: %s Classes: %s Epochs: %d\n\n" % (n_samples, parser.meta.xn_outs, args.iter))
     psc, num_tagged, cum_loss = 0., 0, 0.
     for epoch in range(args.iter):
         random.shuffle(dataset)
