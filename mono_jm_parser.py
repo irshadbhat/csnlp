@@ -251,6 +251,8 @@ class Parser(object):
 
         if self.meta.palgo == 'swap':
             return [(nd.id, nd.form) for nd in s1,s0,n0]
+	elif self.meta.palgo == "eager":
+            return [(nd.id, nd.form) for nd in s0, n0]
         else:
             return [(nd.id, nd.form) for nd in s1,s0]
 
