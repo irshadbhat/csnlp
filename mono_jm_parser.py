@@ -53,7 +53,7 @@ class ClientThread(threading.Thread):
 
 
 class Meta:
-    def __init__(self, palgo='eager'):
+    def __init__(self, palgo='swap'):
         self.palgo = palgo  # parsing algorithm
         self.c_dim = 32  # character-rnn input dimension
         self.add_words = 1  # additional lookup for missing/special words
@@ -61,15 +61,13 @@ class Meta:
         self.n_hidden = 128  # parser-mlp hidden layer dimension
         self.lstm_wc_dim = 128  # LSTM (word-char concatenated input) output dimension
         self.lstm_char_dim = 64  # char-LSTM output dimension
+        self.window = 2 
+        self.transitions = {'SHIFT':0,'LEFTARC':1,'RIGHTARC':2}  # parser core transitions
         if palgo == 'eager':
-            self.window = 2 
-            self.transitions = {'SHIFT':0,'LEFTARC':1,'RIGHTARC':2,'REDUCE':3}  # parser transitions
+            self.transitions['REDUCE'] = 3
         elif palgo == 'swap':
             self.window = 3
-            self.transitions = {'SHIFT':0,'LEFTARC':1,'RIGHTARC':2,'SWAP':3}  # parser transitions
-        else:  # standard
-            self.window = 2 
-            self.transitions = {'SHIFT':0,'LEFTARC':1,'RIGHTARC':2}  # parser transitions
+            self.transitions['SWAP'] = 3
 
 class Configuration(object):
     def __init__(self, nodes=[], standard=False):
