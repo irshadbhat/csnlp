@@ -9,18 +9,22 @@ import string
 import random
 import pickle
 import socket
+import argparse
 import StringIO
 import threading
 
-import argparse
 import numpy as np
 from collections import Counter, namedtuple, defaultdict
 
 import dynet as dy
 from gensim.models.word2vec import Word2Vec
 
-from arc_eager import ArcEager
-from pseudoProjectivity import *
+from algorithms.swap import Swap
+from utils.inorder_traversal import * #get_in_order(graph) without dummies
+from utils.pseudoProjectivity import *
+from algorithms.arc_eager import ArcEager
+from algorithms.arc_standard import ArcStandard
+
 
 _MAX_BUFFER_SIZE_ = 102400 #100KB
 
@@ -49,26 +53,47 @@ class ClientThread(threading.Thread):
 
 
 class Meta:
-    def __init__(self):
+    def __init__(self, palgo='eager'):
+        self.palgo = palgo  # parsing algorithm
         self.c_dim = 32  # character-rnn input dimension
-        self.window = 2  # arc-eager feature window
         self.add_words = 1  # additional lookup for missing/special words
         self.p_hidden = 64  # pos-mlp hidden layer dimension
         self.n_hidden = 128  # parser-mlp hidden layer dimension
         self.lstm_wc_dim = 128  # LSTM (word-char concatenated input) output dimension
         self.lstm_char_dim = 64  # char-LSTM output dimension
-        self.transitions = {'SHIFT':0,'LEFTARC':1,'RIGHTARC':2,'REDUCE':3}  # parser transitions
+        if palgo == 'eager':
+            self.window = 2 
+            self.transitions = {'SHIFT':0,'LEFTARC':1,'RIGHTARC':2,'REDUCE':3}  # parser transitions
+        elif palgo == 'swap':
+            self.window = 3
+            self.transitions = {'SHIFT':0,'LEFTARC':1,'RIGHTARC':2,'SWAP':3}  # parser transitions
+        else:  # standard
+            self.window = 2 
+            self.transitions = {'SHIFT':0,'LEFTARC':1,'RIGHTARC':2}  # parser transitions
 
 class Configuration(object):
-    def __init__(self, nodes=[]):
-        self.stack = list()
+    def __init__(self, nodes=[], standard=False):
         self.b0 = 1
-        self.nodes = nodes
+        self.stack = list()
+        self.queue = range(len(nodes))[1:]
+        if standard:
+            self.nodes = nodes[:1] + get_in_order(nodes[1:-1]) + nodes[-1:]
+            for tnode in range(1, len(self.nodes[1:-1])+1):
+                tnodeparent = self.nodes[self.nodes[tnode].parent]
+                self.nodes[tnodeparent.id] = self.nodes[tnodeparent.id]._replace(children=tnodeparent.children+[tnode])
+        else:
+            self.nodes = nodes
 
-class Parser(ArcEager):
+class Parser(object):
     def __init__(self, model=None, meta=None):
-        self.model = dy.Model()
         self.meta = pickle.load(open('%s.meta' %model, 'rb')) if model else meta
+        self.model = dy.Model()
+        if self.meta.palgo == 'eager':
+            self.transitionSystem = ArcEager()
+        elif self.meta.palgo == 'swap':
+            self.transitionSystem = Swap()
+        else: 
+            self.transitionSystem = ArcStandard()
 
         # define pos-mlp
         self.ps_pW1 = self.model.add_parameters((self.meta.p_hidden, self.meta.lstm_wc_dim*2))
@@ -201,51 +226,33 @@ class Parser(ArcEager):
             word_embs.append(self.word_rep(node.form))
         return word_embs
 
-    def basefeaturesEager(self, nodes, stack, i):
-	#NOTE Stack nodes
-        #s2 = nodes[stack[-3]] if stack[2:] else nodes[0].left
-        #s1 = nodes[stack[-2]] if stack[1:] else nodes[0].left
-        s0 = nodes[stack[-1]] if stack else nodes[0].left
-
-	#NOTE Buffer nodes
-	n0 = nodes[ i ] if nodes[ i: ] else nodes[0].left
-
-	#NOTE Leftmost and Rightmost children of s2,s1,s0 and b0(only leftmost)
-	#s2l = nodes[s2.left [-1]] if s2.left [-1] != None else nodes[0].left
-	#s2r = nodes[s2.right[-1]] if s2.right[-1] != None else nodes[0].left
-	#s1l = nodes[s1.left [-1]] if s1.left [-1] != None else nodes[0].left
-	#s1r = nodes[s1.right[-1]] if s1.right[-1] != None else nodes[0].left
-	#s0l = nodes[s0.left [-1]] if s0.left [-1] != None else nodes[0].left
-	#s0r = nodes[s0.right[-1]] if s0.right[-1] != None else nodes[0].left
-	#n0l = nodes[n0.left [-1]] if n0.left [-1] != None else nodes[0].left
-	
-	#return [(nd.id, nd.form) for nd in s0,n0,s1,s2,n0l,s0r,s0l,s1r,s1l]
-	return [(nd.id, nd.form) for nd in s0,n0]
-	
-    def basefeaturesStandard(self, nodes, stack, i):
-	#NOTE Stack nodes
+    def basefeatures(self, nodes, stack, i):
+        #NOTE Stack nodes
         #s3 = nodes[stack[-4]] if stack[3:] else nodes[0].left
         #s2 = nodes[stack[-3]] if stack[2:] else nodes[0].left
-        #s1 = nodes[stack[-2]] if stack[1:] else nodes[0].left
+        s1 = nodes[stack[-2]] if stack[1:] else nodes[0].left
         s0 = nodes[stack[-1]] if stack else nodes[0].left
 
-	#NOTE Buffer nodes
-	n0 = nodes[ i ] if nodes[ i: ] else nodes[0].left
-	#n0left = n0.left if i else [None]
+        #NOTE Buffer nodes
+        n0 = nodes[i] if nodes[i:] else nodes[0].left # i here is the first node in the queue (impt. for swap action)
+        #n0left = n0.left if i else [None]
 
-	#NOTE Leftmost and Rightmost children of s2,s1,s0 and b0(only leftmost)
-	#s3l = nodes[s3.left [-1]] if s3.left [-1] != None else nodes[0].left
-	#s3r = nodes[s3.right[-1]] if s3.right[-1] != None else nodes[0].left
-	#s2l = nodes[s2.left [-1]] if s2.left [-1] != None else nodes[0].left
-	#s2r = nodes[s2.right[-1]] if s2.right[-1] != None else nodes[0].left
-	#s1l = nodes[s1.left [-1]] if s1.left [-1] != None else nodes[0].left
-	#s1r = nodes[s1.right[-1]] if s1.right[-1] != None else nodes[0].left
-	#s0l = nodes[s0.left [-1]] if s0.left [-1] != None else nodes[0].left
-	#s0r = nodes[s0.right[-1]] if s0.right[-1] != None else nodes[0].left
-	#n0l = nodes[n0left [-1]]  if n0left  [-1] != None else nodes[0].left
-	#n0r = nodes[n0.right[-1]] if n0.right[-1] != None else nodes[0].left
-	
-	return [(nd.id, nd.form) for nd in s0,n0]
+        #NOTE Leftmost and Rightmost children of s2,s1,s0 and b0(only leftmost)
+        #s3l = nodes[s3.left [-1]] if s3.left [-1] != None else nodes[0].left
+        #s3r = nodes[s3.right[-1]] if s3.right[-1] != None else nodes[0].left
+        #s2l = nodes[s2.left [-1]] if s2.left [-1] != None else nodes[0].left
+        #s2r = nodes[s2.right[-1]] if s2.right[-1] != None else nodes[0].left
+        #s1l = nodes[s1.left [-1]] if s1.left [-1] != None else nodes[0].left
+        #s1r = nodes[s1.right[-1]] if s1.right[-1] != None else nodes[0].left
+        #s0l = nodes[s0.left [-1]] if s0.left [-1] != None else nodes[0].left
+        #s0r = nodes[s0.right[-1]] if s0.right[-1] != None else nodes[0].left
+        #n0l = nodes[n0left [-1]]  if n0left  [-1] != None else nodes[0].left
+        #n0r = nodes[n0.right[-1]] if n0.right[-1] != None else nodes[0].left
+
+        if self.meta.palgo == 'swap':
+            return [(nd.id, nd.form) for nd in s1,s0,n0]
+        else:
+            return [(nd.id, nd.form) for nd in s1,s0]
 
     def feature_extraction(self, sentence):
         self.initialize_graph_nodes()
@@ -272,7 +279,6 @@ class Parser(ArcEager):
             pos_hidden.append(xh)
             xh = self.meta.activation(xh) + self.ps_b1
             xo = self.ps_W2*xh + self.ps_b2
-            #tid = self.meta.p2i[node.tag]
             err = dy.softmax(xo).npvalue() if self.eval else dy.pickneglogsoftmax(xo, self.meta.p2i[node.tag])
             pos_errs.append(err)
 
@@ -286,45 +292,56 @@ class Parser(ArcEager):
         return  pr_bi_exps, pos_errs
 
     def predict(self, configuration, pr_bi_exps):
-        rfeatures = self.basefeaturesEager(configuration.nodes, configuration.stack, configuration.b0)
+        rfeatures = self.basefeatures(configuration.nodes, configuration.stack, configuration.b0)
         xi = dy.concatenate([pr_bi_exps[id-1] if id > 0 else self.pad for id, rform in rfeatures])
         xh = self.pr_W1 * xi
         xh = self.meta.activation(xh) + self.pr_b1
         return self.pr_W2*xh + self.pr_b2
     
-
 def Train(sentence, epoch, dynamic=True):
     parser.eval = False
-    configuration = Configuration(sentence)
+    if parser.meta.palgo in ['standard', 'swap']:
+        configuration = Configuration(sentence, standard=True)
+    else:
+        configuration = Configuration(sentence)
     pr_bi_exps, pos_errs = parser.feature_extraction(sentence[1:-1])
-    while not parser.isFinalState(configuration):
+    while not parser.transitionSystem.inFinalState(configuration):
         xo = parser.predict(configuration, pr_bi_exps)
-        output_probs = dy.softmax(xo).npvalue()
-        ranked_actions = sorted(zip(output_probs, range(len(output_probs))), reverse=True)
-        pscore, paction = ranked_actions[0]
+        if parser.meta.palgo in ['swap', 'standard']: # Static Oracle
+            goldTransitionFunc, goldLabel = parser.transitionSystem.LabelledAction(configuration)
+            goldTransition = goldTransitionFunc.__name__
+            parser.loss.append(dy.pickneglogsoftmax(xo, parser.meta.td2i[(goldTransition, goldLabel)]))
+            goldTransitionFunc(configuration, goldLabel)
+        else: # Dynamic Oracle
+            output_probs = dy.softmax(xo).npvalue()
+            ranked_actions = sorted(zip(output_probs, range(len(output_probs))), reverse=True)
+            pscore, paction = ranked_actions[0]
 
-        validTransitions, allmoves = parser.get_valid_transitions(configuration) #{0: <bound method arceager.SHIFT>}
-        while parser.action_cost(configuration, parser.meta.i2td[paction], parser.meta.transitions, validTransitions) > 500:
-           ranked_actions = ranked_actions[1:]
-           pscore, paction = ranked_actions[0]
+            #{0: <bound method arceager.SHIFT>}
+            validTransitions, allmoves = parser.transitionSystem.get_valid_transitions(configuration) 
+            while parser.transitionSystem.action_cost(\
+                    configuration, parser.meta.i2td[paction], parser.meta.transitions, validTransitions) > 500:
+               ranked_actions = ranked_actions[1:]
+               pscore, paction = ranked_actions[0]
 
-        gaction = None
-        for i,(score, ltrans) in enumerate(ranked_actions):
-           cost = parser.action_cost(configuration, parser.meta.i2td[ltrans], parser.meta.transitions, validTransitions)
-           if cost == 0:
-              gaction = ltrans
-              need_update = (i > 0)
-              break
+            gaction = None
+            for i,(score, ltrans) in enumerate(ranked_actions):
+               cost = parser.transitionSystem.action_cost(\
+                            configuration, parser.meta.i2td[ltrans], parser.meta.transitions, validTransitions)
+               if cost == 0:
+                  gaction = ltrans
+                  need_update = (i > 0)
+                  break
 
-        gtransitionstr, goldLabel = parser.meta.i2td[gaction]
-        ptransitionstr, predictedLabel = parser.meta.i2td[paction]
-        if dynamic and (epoch > 2) and (np.random.random() < 0.9):
-           predictedTransitionFunc = allmoves[parser.meta.transitions[ptransitionstr]]
-           predictedTransitionFunc(configuration, predictedLabel)
-        else:
-           goldTransitionFunc = allmoves[parser.meta.transitions[gtransitionstr]]
-           goldTransitionFunc(configuration, goldLabel)
-        parser.loss.append(dy.pickneglogsoftmax(xo, parser.meta.td2i[(gtransitionstr, goldLabel)])) #NOTE original
+            gtransitionstr, goldLabel = parser.meta.i2td[gaction]
+            ptransitionstr, predictedLabel = parser.meta.i2td[paction]
+            if dynamic and (epoch > 2) and (np.random.random() < 0.9):
+               predictedTransitionFunc = allmoves[parser.meta.transitions[ptransitionstr]]
+               predictedTransitionFunc(configuration, predictedLabel)
+            else:
+               goldTransitionFunc = allmoves[parser.meta.transitions[gtransitionstr]]
+               goldTransitionFunc(configuration, goldLabel)
+            parser.loss.append(dy.pickneglogsoftmax(xo, parser.meta.td2i[(gtransitionstr, goldLabel)])) #NOTE original
 
     parser.loss.extend(pos_errs)
 
@@ -337,10 +354,10 @@ def build_dependency_graph(parser, graph):
         pred_pos.append(p_tag)
 
     configuration = Configuration(graph)
-    while not parser.isFinalState(configuration):
+    while not parser.transitionSystem.inFinalState(configuration):
         output_probs = parser.predict(configuration, pr_bi_exps)
         output_probs = dy.softmax(output_probs).npvalue()
-        validTransitions, _ = parser.get_valid_transitions(configuration) #{0: <bound method arceager.SHIFT>}
+        validTransitions, _ = parser.transitionSystem.get_valid_transitions(configuration) #{0: <bound method arceager.SHIFT>}
         sortedPredictions = sorted(zip(output_probs, range(len(output_probs))), reverse=True)
         for score, action in sortedPredictions:
             transition, predictedLabel = parser.meta.i2td[action]
@@ -348,7 +365,11 @@ def build_dependency_graph(parser, graph):
                 predictedTransitionFunc = validTransitions[parser.meta.transitions[transition]]
                 predictedTransitionFunc(configuration, predictedLabel)
                 break
-    return deprojectivize(graph[1:-1]), pred_pos
+
+    if parser.meta.palgo == 'swap':
+        return graph[1:-1], pred_pos
+    else:
+        return deprojectivize(graph[1:-1]), pred_pos
 
 
 def test_conll(parser, dev_file, ofp=None):
@@ -373,7 +394,7 @@ def test_conll(parser, dev_file, ofp=None):
                             unicode(node.pparent), node.pdrel.strip('%'), u'_', u'_'])+'\n')
             ofp.write(u'\n')
 
-    pos_score = correct_pos/(correct_pos+incorrect_pos)
+    pos_score = round(100. * correct_pos/(correct_pos+incorrect_pos), 2)
     UAS = round(100. * scores['rightAttach']/(scores['rightAttach']+scores['wrongAttach']),2)
     LS  = round(100. * scores['rightLabel']/(scores['rightLabel']+scores['wrongLabel']), 2)
     LAS = round(100. * scores['rightLabeledAttach']/(scores['rightLabeledAttach']+scores['wrongLabeledAttach']),2)
@@ -425,34 +446,35 @@ def train_parser(dataset):
         random.shuffle(dataset)
         parser.loss = []
         dy.renew_cg()
-    	for sid, sentence in enumerate(dataset, 1):
+        for sid, sentence in enumerate(dataset, 1):
             if sid % 500 == 0 or sid == n_samples:   # print status
                 trainer.status()
                 print(cum_loss / num_tagged)
                 cum_loss, num_tagged = 0, 0
-	        sys.stdout.flush()
-	    csentence = copy.deepcopy(sentence)
-	    Train(csentence, epoch+1)
-	    num_tagged += 2 * len(sentence[1:-1]) - 1
-            if len(parser.loss) > 75:
+                sys.stdout.flush()
+            csentence = copy.deepcopy(sentence)
+            Train(csentence, epoch+1)
+            num_tagged += 2 * len(sentence[1:-1]) - 1
+            if len(parser.loss) > 500:
                 batch_loss = dy.esum(parser.loss)
                 cum_loss += batch_loss.scalar_value()
-	        batch_loss.backward()
+                batch_loss.backward()
                 trainer.update()
                 parser.loss = []
                 dy.renew_cg()
-	sys.stderr.flush()
+        sys.stderr.flush()
         if parser.loss:
             batch_loss = dy.esum(parser.loss)
             cum_loss += batch_loss.scalar_value()
-	    batch_loss.backward()
+            batch_loss.backward()
             trainer.update()
             parser.loss = []
             dy.renew_cg()
         CLAS = 0.0
         for dfile in args.dev:
             POS, UAS, LS, LAS = test_conll(parser, dfile)
-            sys.stderr.write("{} > POS ACCURACY: {}% UAS: {}%, LS: {}% and LAS: {}%\n".format(dfile.rsplit('/')[-1][:3], POS, UAS, LS, LAS))
+            sys.stderr.write(\
+                "{} > POS ACCURACY: {}% UAS: {}%, LS: {}% and LAS: {}%\n".format(dfile.rsplit('/')[-1][:3], POS, UAS, LS, LAS))
             CLAS += LAS
         if CLAS > psc:
             sys.stderr.write('SAVE POINT %d\n' %epoch)
@@ -460,37 +482,81 @@ def train_parser(dataset):
             if args.save_model:
                 parser.model.save('%s.dy' %args.save_model)
 
+def MPC(node, parent, tree):
+    if parent == -1:
+        return node
+    else:
+        node, parent = tree[parent].id, tree[parent].pparent
+        return MPC(node, parent,tree)
+
+def MPCs(graph, stparser):
+    configuration = Configuration(graph, standard=True)
+    while not stparser.inFinalState(configuration):
+        goldTransitionFunc, goldLabel = stparser.LabelledAction(configuration)
+        goldTransition = goldTransitionFunc.__name__
+        goldTransitionFunc(configuration, goldLabel)
+
+    for p in range(1,len(configuration.nodes[1:])+1):
+        pN = configuration.nodes[p]
+        pNParent = pN.pparent
+        if pNParent == -1:
+            maxProjection = pN.id
+        else:
+            maxProjection = MPC(pN,pNParent, configuration.nodes)
+        configuration.nodes[p] = configuration.nodes[p]._replace(
+                                        pdrel="__PAD__",
+                                        inorder=-1,
+                                        left=[None],
+                                        right=[None],
+                                        children=[],
+                                        mpc=maxProjection)
+    configuration.nodes[-1] = configuration.nodes[-1]._replace(inorder=p)
+    return [cNode._replace(pparent=-1) for cNode in configuration.nodes]
+
+def projective(nodes):
+    """Identifies if a tree is non-projective or not."""
+    for leaf1 in nodes:
+        v1,v2 = sorted([int(leaf1.id), int(leaf1.parent)])
+        for leaf2 in nodes:
+            v3, v4 = sorted([int(leaf2.id), int(leaf2.parent)])
+            if leaf1.id == leaf2.id:continue
+            if (v1 < v3 < v2) and (v4 > v2): return False
+    return True
+
+
 def depenencyGraph(sentence):
     """Representation for dependency trees"""
-    leaf = namedtuple('leaf', ['id','form','lemma','tag','ctag','features','parent','pparent', 'drel','pdrel','left','right', 'visit'])
-    PAD = leaf._make([-1,'PAD','PAD','PAD','PAD','PAD',-1,-1,'PAD','PAD',[None],[None], False])
-    yield leaf._make([0, 'ROOT_F', 'ROOT_L', 'ROOT_P', 'ROOT_C', 'ROOT_T', -1, -1, 'ROOT', 'ROOT', PAD, [None], False])
+    leaf = namedtuple('leaf', ['id','form','lemma','tag','ctag','features','parent','pparent',
+                               'drel','pdrel','left','right', 'visit','inorder','children','mpc'])
+    PAD = leaf._make([-1,'PAD','PAD','PAD','PAD','PAD',-1,-1,'PAD','PAD',[None],[None], False,-1, [],-1])
+    yield leaf._make([0, 'ROOT_F', 'ROOT_L', 'ROOT_P', 'ROOT_C', 'ROOT_T', -1, -1, 'ROOT', 'ROOT', PAD, [None], False,-1, [], 0])
 
-    for node in sentence.split("\n"):
+    for idx, node in enumerate(sentence.split("\n"), 1):
         id_,form,lemma,tag,ctag,features,parent,drel = node.split("\t")[:8]
         #drel = drel.replace('-', '_')
         if args.ud:
-            node = leaf._make([int(id_),form,lemma,tag,ctag,features,int(parent),-1,drel,drel,[None],[None], False])
+            node = leaf._make([int(id_),form,lemma,tag,ctag,features,int(parent),-1,drel,drel,[None],[None], False, -1, [], idx])
         else:
-            node = leaf._make([int(id_),form,lemma,ctag,tag,features,int(parent),-1,drel,drel,[None],[None], False])
+            node = leaf._make([int(id_),form,lemma,ctag,tag,features,int(parent),-1,drel,drel,[None],[None], False, -1, [], idx])
         yield node
-    yield leaf._make([0, 'ROOT_F', 'ROOT_L', 'ROOT_P', 'ROOT_C', 'ROOT_T', -1, -1, 'ROOT', 'ROOT', [None], [None], False])
+    yield leaf._make([0, 'ROOT_F', 'ROOT_L', 'ROOT_P', 'ROOT_C', 'ROOT_T', -1, -1, 'ROOT', 'ROOT', [None], [None], False, -1, [], idx+1])
 
 
-def read(fname):
+def read(fname, palgo):
     data = []
+    mpcparser = ArcStandard()
     with io.open(fname, encoding='utf-8') as fp:
         inputGenTrain = re.finditer("(.*?)\n\n", fp.read(), re.S)
 
     for i,sentence in enumerate(inputGenTrain):
         graph = list(depenencyGraph(sentence.group(1)))
-        try:
-            pgraph = graph[:1]+projectivize(graph[1:-1])+graph[-1:]
-        except:
-            sys.stderr.write('Error Sent :: %d\n' %i)
-            sys.stdout.flush()
-            continue
-        data.append(pgraph)
+        if palgo == 'swap':
+            if not projective(graph[1:-1]):
+                graph = MPCs(graph, mpcparser)
+            data.append(graph)
+        else:
+            pgraph = graph[:1] + projectivize(graph[1:-1]) + graph[-1:]
+            data.append(pgraph)
     return data
 
 
@@ -530,6 +596,7 @@ if __name__ == "__main__":
     parser.add_argument('--activation-fn', dest='act_fn', default='tanh', help='Activation function [tanh|rectify|logistic]')
     parser.add_argument('--ud', type=int, default=1, help='1 if UD treebank else 0')
     parser.add_argument('--iter', type=int, default=100, help='No. of Epochs')
+    parser.add_argument('--algo', dest='palgo', action='store', choices=['eager','standard','swap'], help='Parsing Algorithm')
     parser.add_argument('--bvec', type=int, help='1 if binary embedding file else 0')
     group.add_argument('--save-model', dest='save_model', help='Specify path to save model')
     group.add_argument('--load-model', dest='load_model', help='Load Pretrained Model')
@@ -541,16 +608,19 @@ if __name__ == "__main__":
     random.seed(args.seed)
 
     if not args.load_model:
-        meta = Meta()
+        meta = Meta(palgo=args.palgo)
         plabels = set()
         tdlabels = set()
         meta.lang = args.lang
         tdlabels.add(('SHIFT', None))
-        tdlabels.add(('REDUCE', None))
+        if args.palgo == "eager":
+            tdlabels.add(('REDUCE', None))
+        elif args.palgo == "swap":
+            tdlabels.add(('SWAP', None))
 
         train_sents = []
         for tfile in args.train:
-            train_sents += read(tfile)
+            train_sents += read(tfile, args.palgo)
         set_label_map(train_sents)
         wvm = Word2Vec.load_word2vec_format(args.embd, binary=args.bvec, limit=args.elimit)
         meta.w_dim = wvm.syn0.shape[1]
