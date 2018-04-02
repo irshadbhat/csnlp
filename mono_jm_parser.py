@@ -86,6 +86,8 @@ class Parser(object):
     def __init__(self, model=None, meta=None):
         self.meta = pickle.load(open('%s.meta' %model, 'rb')) if model else meta
         self.model = dy.Model()
+        if not getattr(self.meta, 'palgo', None):
+            self.meta.palgo = 'eager'
         if self.meta.palgo == 'eager':
             self.transitionSystem = ArcEager()
         elif self.meta.palgo == 'swap':
