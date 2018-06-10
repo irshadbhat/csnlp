@@ -10,8 +10,6 @@ Install dependencies
 ^^^^^^^^^^^^^^^^^^^^
 
   - pip install -r requirements.txt
-  - `DyNet version 2.0
-    <https://github.com/clab/dynet>`_
 
 Files you care about?
 ^^^^^^^^^^^^^^^^^^^^^
