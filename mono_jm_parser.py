@@ -1,5 +1,8 @@
 #!/usr/bin/python -*- coding: utf-8 -*-
 
+import dynet_config
+dynet_config.set(random_seed=127, autobatch=1)
+
 import io
 import os
 import re
@@ -82,6 +85,7 @@ class Configuration(object):
         else:
             self.nodes = nodes
 
+
 class Parser(object):
     def __init__(self, model=None, meta=None):
         self.meta = pickle.load(open('%s.meta' %model, 'rb')) if model else meta
@@ -131,7 +135,7 @@ class Parser(object):
         self.LOOKUP_CHAR = self.model.add_lookup_parameters((self.meta.n_chars, self.meta.c_dim))
 
         # load pretrained embeddings
-        if model is None:
+        if args.embd and model is None:
             for word, V in wvm.vocab.iteritems():
                 self.LOOKUP_WORD.init_row(V.index+self.meta.add_words, wvm.syn0[V.index])
 
@@ -251,7 +255,7 @@ class Parser(object):
 
         if self.meta.palgo == 'swap':
             return [(nd.id, nd.form) for nd in s1,s0,n0]
-	elif self.meta.palgo == "eager":
+        elif self.meta.palgo == "eager":
             return [(nd.id, nd.form) for nd in s0, n0]
         else:
             return [(nd.id, nd.form) for nd in s1,s0]
@@ -320,20 +324,20 @@ def Train(sentence, epoch, dynamic=True):
             pscore, paction = ranked_actions[0]
 
             #{0: <bound method arceager.SHIFT>}
-            validTransitions, allmoves = parser.transitionSystem.get_valid_transitions(configuration) 
+            validTransitions, allmoves = parser.transitionSystem.get_valid_transitions(configuration)
             while parser.transitionSystem.action_cost(\
                     configuration, parser.meta.i2td[paction], parser.meta.transitions, validTransitions) > 500:
-               ranked_actions = ranked_actions[1:]
-               pscore, paction = ranked_actions[0]
+                ranked_actions = ranked_actions[1:]
+                pscore, paction = ranked_actions[0]
 
             gaction = None
             for i,(score, ltrans) in enumerate(ranked_actions):
-               cost = parser.transitionSystem.action_cost(\
-                            configuration, parser.meta.i2td[ltrans], parser.meta.transitions, validTransitions)
-               if cost == 0:
-                  gaction = ltrans
-                  need_update = (i > 0)
-                  break
+                cost = parser.transitionSystem.action_cost(\
+                    configuration, parser.meta.i2td[ltrans], parser.meta.transitions, validTransitions)
+                if cost == 0:
+                    gaction = ltrans
+                    need_update = (i > 0)
+                    break
 
             gtransitionstr, goldLabel = parser.meta.i2td[gaction]
             ptransitionstr, predictedLabel = parser.meta.i2td[paction]
@@ -348,6 +352,7 @@ def Train(sentence, epoch, dynamic=True):
     parser.loss.extend(pos_errs)
 
 def build_dependency_graph(parser, graph):
+    dy.renew_cg()
     pred_pos = []
     parser.eval = True
     pr_bi_exps, pos_errs = parser.feature_extraction(graph[1:-1])
@@ -457,7 +462,7 @@ def train_parser(dataset):
             csentence = copy.deepcopy(sentence)
             Train(csentence, epoch+1)
             num_tagged += 2 * len(sentence[1:-1]) - 1
-            if len(parser.loss) > 500:
+            if len(parser.loss) > 75:
                 batch_loss = dy.esum(parser.loss)
                 cum_loss += batch_loss.scalar_value()
                 batch_loss.backward()
@@ -535,6 +540,8 @@ def depenencyGraph(sentence):
 
     for idx, node in enumerate(sentence.split("\n"), 1):
         id_,form,lemma,tag,ctag,features,parent,drel = node.split("\t")[:8]
+        if not id_.isdigit():
+            continue
         #drel = drel.replace('-', '_')
         if args.ud:
             node = leaf._make([int(id_),form,lemma,tag,ctag,features,int(parent),-1,drel,drel,[None],[None], False, -1, [], idx])
@@ -598,7 +605,7 @@ if __name__ == "__main__":
     parser.add_argument('--activation-fn', dest='act_fn', default='tanh', help='Activation function [tanh|rectify|logistic]')
     parser.add_argument('--ud', type=int, default=1, help='1 if UD treebank else 0')
     parser.add_argument('--iter', type=int, default=100, help='No. of Epochs')
-    parser.add_argument('--algo', dest='palgo', action='store', choices=['eager','standard','swap'], help='Parsing Algorithm')
+    parser.add_argument('--algo', dest='palgo', action='store', choices=['eager','standard','swap'], default='swap', help='Parsing Algorithm')
     parser.add_argument('--bvec', type=int, help='1 if binary embedding file else 0')
     group.add_argument('--save-model', dest='save_model', help='Specify path to save model')
     group.add_argument('--load-model', dest='load_model', help='Load Pretrained Model')
@@ -620,13 +627,26 @@ if __name__ == "__main__":
         elif args.palgo == "swap":
             tdlabels.add(('SWAP', None))
 
+        meta.w2i = {}
         train_sents = []
         for tfile in args.train:
             train_sents += read(tfile, args.palgo)
         set_label_map(train_sents)
-        wvm = Word2Vec.load_word2vec_format(args.embd, binary=args.bvec, limit=args.elimit)
-        meta.w_dim = wvm.syn0.shape[1]
-        meta.n_words = wvm.syn0.shape[0]+meta.add_words
+
+        if args.embd:
+            wvm = Word2Vec.load_word2vec_format(args.embd, binary=args.bvec, limit=args.elimit)
+            meta.w_dim = wvm.syn0.shape[1]
+            meta.n_words = wvm.syn0.shape[0]+meta.add_words
+            for w in wvm.vocab:
+                meta.w2i[w] = wvm.vocab[w].index + meta.add_words
+        else:
+            for graph in train_sents:
+                for node in graph[1:-1]:
+                    meta.w2i.setdefault(node.form, 0)
+                    meta.w2i[node.form] += 1
+            meta.w2i = {w:i for i,w in enumerate([w for w,c in meta.w2i.items() if c > 9], 1)}
+            meta.w_dim = 64
+            meta.n_words = len(meta.w2i) + 1
 
         meta.i2p = dict(enumerate(plabels))
         meta.i2td = dict(enumerate(tdlabels))
@@ -635,10 +655,6 @@ if __name__ == "__main__":
         meta.n_outs = len(meta.i2td)
         meta.n_tags = len(meta.p2i)
         meta.n_chars = len(meta.c2i)
-
-        meta.w2i = {}
-        for w in wvm.vocab:
-            meta.w2i[w] = wvm.vocab[w].index + meta.add_words
 
         trainers = {
             'momsgd'   : dy.MomentumSGDTrainer,
