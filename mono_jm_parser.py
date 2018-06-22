@@ -135,7 +135,7 @@ class Parser(object):
         self.LOOKUP_CHAR = self.model.add_lookup_parameters((self.meta.n_chars, self.meta.c_dim))
 
         # load pretrained embeddings
-        if args.embd and model is None:
+        if model is None and args.embd:
             for word, V in wvm.vocab.iteritems():
                 self.LOOKUP_WORD.init_row(V.index+self.meta.add_words, wvm.syn0[V.index])
 
