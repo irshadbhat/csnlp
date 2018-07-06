@@ -1,5 +1,16 @@
-Neural Stacking Dependency Parsers for Code Switching texts
-===========================================================
+NLP for Code-Switching Texts
+============================
+
+Bi-LSTM Language Identification System leveraging transliterated outputs pf Non-Roman words
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Coming Soon
+
+Attension based Neural-MT system for Transliteration of Non-Rmoman Languages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Coming Soon
+
+Neural Stacking Dependency Parsers for Monolingual and Code Switching texts
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Neural Stacking Dependency Parsers for monolingual, multilingual and code switching data. This repository contains the source code described in our paper `Universal Dependency Parsing for Hindi-English Code-switching`_ (`Naacl 2018`_).
 
