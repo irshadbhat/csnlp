@@ -1,7 +1,7 @@
 NLP for Code-Switching Texts
 ============================
 
-Bi-LSTM Language Identification System leveraging transliterated outputs pf Non-Roman words
+Bi-LSTM Language Identification System leveraging transliterated outputs of Non-Roman words
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Coming Soon
 
