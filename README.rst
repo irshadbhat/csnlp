@@ -1,14 +1,6 @@
 NLP for Code-Switching Texts
 ============================
 
-Bi-LSTM Language Identification System leveraging transliterated outputs of Non-Roman words
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Coming Soon
-
-Attension based Neural-MT system for Transliteration of Non-Rmoman Languages
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Coming Soon
-
 Neural Stacking Dependency Parsers for Monolingual and Code Switching texts
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
