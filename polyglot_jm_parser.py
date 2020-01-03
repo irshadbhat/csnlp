@@ -447,6 +447,8 @@ def depenencyGraph(sentence, lang=None):
     yield leaf._make([0, 'ROOT_F', 'ROOT_L', 'ROOT_P', 'ROOT_C', defaultdict(str), -1, -1, '__ROOT__', '__ROOT__', PAD, [None], False])
 
     for node in sentence.split("\n"):
+        if node.startswith('#'):
+            continue
         if lang:
             id_,form,lemma,tag,ctag,_,parent,drel = node.split("\t")[:8]
             tlang = lang
@@ -455,6 +457,8 @@ def depenencyGraph(sentence, lang=None):
             tlang = tlang.split('|')[0]
             if tlang != 'hi':
                 tlang = 'en'
+        if not id_.isdigit():
+            continue
         if ':' in drel and drel != 'acl:relcl':
             drel = drel.split(':')[0]
         if drel == 'obl':
